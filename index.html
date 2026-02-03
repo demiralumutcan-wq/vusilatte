@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>💗</title>
+
+  <style>
+    :root{
+      --bg: #ffb6c1;
+      --yes: #ff4d6d;
+      --no: #999;
+    }
+
+    body {
+      margin: 0;
+      height: 100vh;
+      background-color: var(--bg);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      font-family: "Comic Sans MS", cursive, sans-serif;
+      overflow: hidden;
+      text-align: center;
+      padding: 20px;
+    }
+
+    h1 {
+      color: #fff;
+      margin-bottom: 30px;
+      font-size: clamp(24px, 6vw, 40px);
+    }
+
+    .buttons {
+      position: relative;
+      width: 100%;
+      max-width: 360px;
+      height: 180px;
+      border-radius: 18px;
+      pointer-events: auto;
+      user-select: none;
+    }
+
+    button {
+      padding: 14px 26px;
+      font-size: 18px;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      position: absolute;
+      touch-action: manipulation;
+      transition: transform 120ms ease;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.12);
+      will-change: left, top, transform;
+    }
+
+    button:focus {
+      outline: 3px solid rgba(255,255,255,0.35);
+      transform: translateY(-3px);
+    }
+
+    #yes {
+      left: 30px;
+      top: 80px;
+      background-color: var(--yes);
+      color: white;
+    }
+
+    #no {
+      right: 30px;
+      top: 80px;
+      background-color: var(--no);
+      color: white;
+    }
+
+    /* Emoji fall */
+    .emoji {
+      position: fixed;
+      top: -60px;
+      font-size: 32px;
+      animation: fall 2.5s linear forwards;
+      pointer-events: none;
+      will-change: transform, opacity;
+      z-index: 50;
+    }
+
+    @keyframes fall {
+      to {
+        transform: translateY(110vh);
+        opacity: 0;
+      }
+    }
+
+    /* Explosion */
+    .boom {
+      position: fixed;
+      font-size: 40px;
+      animation: explode 0.6s ease-out forwards;
+      pointer-events: none;
+      z-index: 60;
+    }
+
+    @keyframes explode {
+      0% { transform: scale(1); opacity: 1; }
+      100% { transform: scale(2.5); opacity: 0; }
+    }
+
+    /* SCREEN SHAKE */
+    .shake {
+      animation: shake 0.35s;
+    }
+
+    @keyframes shake {
+      0% { transform: translate(0, 0); }
+      20% { transform: translate(-8px, 4px); }
+      40% { transform: translate(8px, -4px); }
+      60% { transform: translate(-6px, -2px); }
+      80% { transform: translate(6px, 2px); }
+      100% { transform: translate(0, 0); }
+    }
+
+    .result {
+      margin-top: 20px;
+      z-index: 40;
+      color: #fff;
+      text-align: center;
+      pointer-events: none;
+    }
+
+    .result img {
+      width: 90%;
+      max-width: 320px;
+      border-radius: 16px;
+      display:block;
+      margin: 0 auto 10px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .emoji, .boom, .shake {
+        animation: none !important;
+        transform: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>hey vusi benim sevgilim olur musun?</h1>
+
+  <div class="buttons" aria-hidden="false">
+    <button id="yes" aria-label="Evet, kabul ediyorum">EVET 💕</button>
+    <button id="no" aria-label="Hayır, istemiyorum">HAYIR 😅</button>
+  </div>
+
+  <script>
+    const noBtn = document.getElementById("no");
+    const yesBtn = document.getElementById("yes");
+    const buttons = document.querySelector(".buttons");
+    let emojiIntervalId = null;
+
+    // Son pointer pozisyonu ve zamanı (hız hesaplamak için)
+    let lastPointer = { x: 0, y: 0, t: 0, vx: 0, vy: 0, active: false };
+    let rafId = null;
+
+    // Başlangıç: no butonunu görünür bir konuma yerleştir
+    function placeInitialNo() {
+      const maxX = Math.max(0, buttons.clientWidth - noBtn.offsetWidth);
+      const maxY = Math.max(0, buttons.clientHeight - noBtn.offsetHeight);
+      noBtn.style.left = `${Math.min(30, maxX)}px`;
+      noBtn.style.top = `${Math.min(80, maxY)}px`;
+    }
+    placeInitialNo();
+
+    // Pointer hareketlerini dinle ve hız hesapla
+    function onPointerMove(e) {
+      const rect = document.documentElement.getBoundingClientRect();
+      const x = e.clientX ?? (e.touches && e.touches[0] && e.touches[0].clientX) ?? lastPointer.x;
+      const y = e.clientY ?? (e.touches && e.touches[0] && e.touches[0].clientY) ?? lastPointer.y;
+      const t = performance.now();
+
+      if (!lastPointer.t) {
+        lastPointer = { x, y, t, vx: 0, vy: 0, active: true };
+        return;
+      }
+
+      const dt = Math.max(1, t - lastPointer.t);
+      const vx = (x - lastPointer.x) / dt;
+      const vy = (y - lastPointer.y) / dt;
+
+      lastPointer = { x, y, t, vx, vy, active: true };
+    }
+
+    // Butonu pointer'tan kaçır (raf ile pürüzsüz)
+    function updateNoPosition() {
+      if (!lastPointer.active) {
+        rafId = requestAnimationFrame(updateNoPosition);
+        return;
+      }
+
+      const btnRect = noBtn.getBoundingClientRect();
+      const contRect = buttons.getBoundingClientRect();
+
+      // Buton & pointer merkezleri (container koordinatlarında)
+      const btnCx = btnRect.left + btnRect.width / 2;
+      const btnCy = btnRect.top + btnRect.height / 2;
+      const ptrX = lastPointer.x;
+      const ptrY = lastPointer.y;
+
+      // Vektör pointer -> button
+      let dx = btnCx - ptrX;
+      let dy = btnCy - ptrY;
+      const dist = Math.hypot(dx, dy) || 1;
+
+      // Hız büyüklüğü (imleç hızı)
+      const speed = Math.hypot(lastPointer.vx, lastPointer.vy);
+
+      // Kaçış mesafesi: minimum mesafe + hız katsayısı
+      const minDist = Math.max(110, Math.min(220, 120 + speed * 600)); // hız arttıkça daha uzak
+      // normalize ve yeni merkez konumu
+      dx = dx / dist;
+      dy = dy / dist;
+
+      let targetCx = ptrX + dx * minDist;
+      let targetCy = ptrY + dy * minDist;
+
+      // Buton sol/üst pozisyonu container'a göre hesapla
+      const left = targetCx - contRect.left - btnRect.width / 2;
+      const top = targetCy - contRect.top - btnRect.height / 2;
+
+      // Clamp
+      const maxLeft = Math.max(0, buttons.clientWidth - btnRect.width);
+      const maxTop = Math.max(0, buttons.clientHeight - btnRect.height);
+      const clampedLeft = Math.min(maxLeft, Math.max(0, left + (Math.random()-0.5)*20)); // hafif jitter
+      const clampedTop = Math.min(maxTop, Math.max(0, top + (Math.random()-0.5)*20));
+
+      noBtn.style.left = `${clampedLeft}px`;
+      noBtn.style.top = `${clampedTop}px`;
+
+      rafId = requestAnimationFrame(updateNoPosition);
+    }
+
+    // Event bağlamaları
+    // Pointer move: fare ve stylus
+    window.addEventListener("pointermove", onPointerMove);
+    // Dokunma hareketi (mobile)
+    window.addEventListener("touchmove", onPointerMove, { passive: true });
+
+    // Pointer enter: animasyonu başlat
+    noBtn.addEventListener("pointerenter", () => {
+      if (!rafId) rafId = requestAnimationFrame(updateNoPosition);
+    });
+
+    // Eğer keyboard ile focuslanırsa: rastgele hızlı hareket ettir
+    noBtn.addEventListener("focus", () => {
+      // küçük rastgele sıçrama
+      moveNoRandom();
+    });
+
+    // Dokunma başlangıcında kaçmaya başla (dokunmadan önce preventDefault istemiyorum; burada sadece kaçır)
+    noBtn.addEventListener("touchstart", (e) => {
+      // touch koordinatlarını alıp hız değerini sıfırla, sonra kaç
+      if (e.touches && e.touches[0]) {
+        const t = e.touches[0];
+        lastPointer = { x: t.clientX, y: t.clientY, t: performance.now(), vx: 0, vy: 0, active: true };
+      }
+      if (!rafId) rafId = requestAnimationFrame(updateNoPosition);
+      e.preventDefault();
+    }, { passive: false });
+
+    // Fallback: eğer imleç yavaşsa veya hiç hareket yoksa random kaçış
+    function moveNoRandom() {
+      const maxX = Math.max(0, buttons.clientWidth - noBtn.offsetWidth);
+      const maxY = Math.max(0, buttons.clientHeight - noBtn.offsetHeight);
+      const x = Math.random() * maxX;
+      const y = Math.random() * maxY;
+      noBtn.style.left = `${x}px`;
+      noBtn.style.top = `${y}px`;
+    }
+
+    // EVET butonuna tıklandığında: mevcut davranış
+    yesBtn.addEventListener("click", () => {
+      if (emojiIntervalId) return;
+
+      if (navigator.vibrate) {
+        try { navigator.vibrate([200, 100, 200, 100, 300]); } catch(e) {}
+      }
+
+      showResult();
+
+      const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!prefersReduced) {
+        emojiIntervalId = setInterval(createEmoji, 220);
+      }
+    });
+
+    function showResult() {
+      const title = document.querySelector("h1");
+      if (title) title.textContent = "HELL YEAH 🔥💣";
+
+      const result = document.createElement("div");
+      result.className = "result";
+      result.innerHTML = `
+        <img src="https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif" alt="Celebration GIF" />
+        <h2>Artık sevgiliyiz 😎💘</h2>
+      `;
+      document.body.appendChild(result);
+
+      buttons.style.pointerEvents = "none";
+      yesBtn.style.transform = "scale(1.02)";
+
+      // Artık no butonu tepkisini durdur
+      if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+      lastPointer.active = false;
+    }
+
+    function createEmoji() {
+      const emoji = document.createElement("div");
+      emoji.className = "emoji";
+      emoji.innerText = Math.random() > 0.6 ? "💣" : "🔥";
+      emoji.style.left = Math.random() * 100 + "vw";
+      document.body.appendChild(emoji);
+
+      if (emoji.innerText === "💣") {
+        setTimeout(() => explode(emoji), 1700);
+      }
+
+      setTimeout(() => {
+        if (emoji && emoji.remove) emoji.remove();
+      }, 2600);
+    }
+
+    function explode(emoji) {
+      const boom = document.createElement("div");
+      boom.className = "boom";
+      boom.innerText = "💥";
+      boom.style.left = emoji.style.left;
+      boom.style.top = "70vh";
+      document.body.appendChild(boom);
+
+      if (navigator.vibrate) {
+        try { navigator.vibrate(150); } catch(e) {}
+      }
+      document.body.classList.add("shake");
+      setTimeout(() => document.body.classList.remove("shake"), 350);
+
+      setTimeout(() => {
+        if (boom && boom.remove) boom.remove();
+      }, 600);
+    }
+
+    window.addEventListener("pagehide", () => {
+      if (emojiIntervalId) clearInterval(emojiIntervalId);
+      if (rafId) cancelAnimationFrame(rafId);
+    });
+
+    // Resize durumunda butonu kontrole al
+    window.addEventListener("resize", () => {
+      // container büyüklüğü değişince butonları görünür sınır içine taşı
+      const maxLeft = Math.max(0, buttons.clientWidth - noBtn.offsetWidth);
+      const maxTop = Math.max(0, buttons.clientHeight - noBtn.offsetHeight);
+      const curLeft = parseFloat(noBtn.style.left) || 0;
+      const curTop = parseFloat(noBtn.style.top) || 0;
+      noBtn.style.left = `${Math.min(maxLeft, Math.max(0, curLeft))}px`;
+      noBtn.style.top = `${Math.min(maxTop, Math.max(0, curTop))}px`;
+    });
+  </script>
+
+</body>
+</html>
