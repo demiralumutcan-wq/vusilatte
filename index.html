@@ -9,7 +9,7 @@
     :root{
       --bg: #ffb6c1;
       --yes: #ff4d6d;
-      --no: #999;
+      --no: #6b6b6b; /* increased contrast for accessibility */
     }
 
     body {
@@ -50,7 +50,7 @@
       cursor: pointer;
       position: absolute;
       touch-action: manipulation;
-      transition: transform 120ms ease;
+      transition: transform 120ms ease, left 160ms ease, top 160ms ease;
       box-shadow: 0 6px 14px rgba(0,0,0,0.12);
       will-change: left, top, transform;
     }
@@ -137,10 +137,24 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .emoji, .boom, .shake {
+      .emoji, .boom, .shake, button {
         animation: none !important;
         transform: none !important;
+        transition: none !important;
       }
+    }
+
+    /* Screen-reader only text */
+    .sr-only {
+      position: absolute !important;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
     }
   </style>
 </head>
@@ -148,10 +162,12 @@
 
   <h1>hey vusi benim sevgilim olur musun?</h1>
 
-  <div class="buttons" aria-hidden="false">
+  <div class="buttons" role="group" aria-label="Seçenekler" aria-hidden="false">
     <button id="yes" aria-label="Evet, kabul ediyorum">EVET 💕</button>
     <button id="no" aria-label="Hayır, istemiyorum">HAYIR 😅</button>
   </div>
+
+  <div id="sr-status" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 
   <script>
     const noBtn = document.getElementById("no");
@@ -162,6 +178,9 @@
     // Son pointer pozisyonu ve zamanı (hız hesaplamak için)
     let lastPointer = { x: 0, y: 0, t: 0, vx: 0, vy: 0, active: false };
     let rafId = null;
+    // Erişilebilirlik / modalite
+    let lastInteractionWasKeyboard = false;
+    const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     // Başlangıç: no butonunu görünür bir konuma yerleştir
     function placeInitialNo() {
@@ -246,14 +265,21 @@
     // Dokunma hareketi (mobile)
     window.addEventListener("touchmove", onPointerMove, { passive: true });
 
-    // Pointer enter: animasyonu başlat
-    noBtn.addEventListener("pointerenter", () => {
-      if (!rafId) rafId = requestAnimationFrame(updateNoPosition);
+    // Pointer enter: animasyonu başlat (sadece fare/stylus)
+    noBtn.addEventListener("pointerenter", (e) => {
+      if (e.pointerType === 'mouse' || e.pointerType === 'pen') {
+        if (!rafId) rafId = requestAnimationFrame(updateNoPosition);
+      }
     });
 
-    // Eğer keyboard ile focuslanırsa: rastgele hızlı hareket ettir
+    // Eğer keyboard ile focuslanırsa: kaçış davranışını devre dışı bırak (erişilebilirlik)
     noBtn.addEventListener("focus", () => {
-      // küçük rastgele sıçrama
+      if (lastInteractionWasKeyboard) {
+        noBtn.classList.add('keyboard-focus');
+        const sr = document.getElementById('sr-status');
+        if (sr) sr.textContent = 'Hayır butonu odakta. Enter tuşuna basarak seçebilirsiniz.';
+        return;
+      }
       moveNoRandom();
     });
 
@@ -282,13 +308,12 @@
     yesBtn.addEventListener("click", () => {
       if (emojiIntervalId) return;
 
-      if (navigator.vibrate) {
+      if (!prefersReduced && navigator.vibrate) {
         try { navigator.vibrate([200, 100, 200, 100, 300]); } catch(e) {}
       }
 
       showResult();
 
-      const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       if (!prefersReduced) {
         emojiIntervalId = setInterval(createEmoji, 220);
       }
@@ -300,11 +325,16 @@
 
       const result = document.createElement("div");
       result.className = "result";
+      result.setAttribute('role', 'status');
+      result.setAttribute('aria-live', 'polite');
       result.innerHTML = `
-        <img src="https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif" alt="Celebration GIF" />
+        <img src="https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif" alt="Kutlama" />
         <h2>Artık sevgiliyiz 😎💘</h2>
       `;
       document.body.appendChild(result);
+
+      const sr = document.getElementById('sr-status');
+      if (sr) sr.textContent = 'Evet seçildi, kutlama başladı.';
 
       buttons.style.pointerEvents = "none";
       yesBtn.style.transform = "scale(1.02)";
@@ -338,11 +368,13 @@
       boom.style.top = "70vh";
       document.body.appendChild(boom);
 
-      if (navigator.vibrate) {
+      if (!prefersReduced && navigator.vibrate) {
         try { navigator.vibrate(150); } catch(e) {}
       }
-      document.body.classList.add("shake");
-      setTimeout(() => document.body.classList.remove("shake"), 350);
+      if (!prefersReduced) {
+        document.body.classList.add("shake");
+        setTimeout(() => document.body.classList.remove("shake"), 350);
+      }
 
       setTimeout(() => {
         if (boom && boom.remove) boom.remove();
@@ -364,6 +396,14 @@
       noBtn.style.left = `${Math.min(maxLeft, Math.max(0, curLeft))}px`;
       noBtn.style.top = `${Math.min(maxTop, Math.max(0, curTop))}px`;
     });
+
+    // interaction modality detection (keyboard vs pointer)
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab' || e.key === 'Shift' || e.key === 'Enter' || e.key === ' ') {
+        lastInteractionWasKeyboard = true;
+      }
+    }, true);
+    window.addEventListener('pointerdown', () => { lastInteractionWasKeyboard = false; }, true);
   </script>
 
 </body>
